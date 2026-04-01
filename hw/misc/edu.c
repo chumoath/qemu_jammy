@@ -87,7 +87,8 @@ static void edu_raise_irq(EduState *edu, uint32_t val)
     edu->irq_status |= val;
     if (edu->irq_status) {
         if (edu_msi_enabled(edu)) {
-            msi_notify(&edu->pdev, 0);
+            msi_notify(&edu->pdev, 1);
+            msi_notify(&edu->pdev, 3);
         } else {
             pci_set_irq(&edu->pdev, 1);
         }
@@ -366,7 +367,7 @@ static void pci_edu_realize(PCIDevice *pdev, Error **errp)
 
     pci_config_set_interrupt_pin(pci_conf, 1);
 
-    if (msi_init(pdev, 0, 1, true, false, errp)) {
+    if (msi_init(pdev, 0, 4, true, false, errp)) {
         return;
     }
 
