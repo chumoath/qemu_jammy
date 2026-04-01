@@ -32,6 +32,7 @@
 #include "qemu/main-loop.h" /* iothread mutex */
 #include "qemu/module.h"
 #include "qapi/visitor.h"
+#include "standard-headers/linux/pci_regs.h"
 
 #define TYPE_PCI_EDU_DEVICE "edu"
 typedef struct EduState EduState;
@@ -381,6 +382,19 @@ static void pci_edu_realize(PCIDevice *pdev, Error **errp)
     memory_region_init_io(&edu->mmio, OBJECT(edu), &edu_mmio_ops, edu,
                     "edu-mmio", 1 * MiB);
     pci_register_bar(pdev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &edu->mmio);
+    
+    // 注册PCIe设备能力，表示是一个pcie设备；0 表示从 0x40-0x100寻找空间
+    if (pcie_endpoint_cap_v1_init(pdev, 0) < 0) {
+        hw_error("Failed to initialize PCIe capability");
+    }
+
+    // pdev->exp.exp_cap为PCIe设备能力结构体所在的偏移
+    uint32_t pos = pdev->exp.exp_cap;
+    // DEVCAP 和 DEVCTL 的位置不一样
+    #define  PCI_EXP_DEVCAP_PAYLOAD_256B   0x1
+    // 设置DEVCAP的mps为256B
+    pci_long_test_and_set_mask(pdev->config + pos + PCI_EXP_DEVCAP,
+                                PCI_EXP_DEVCAP_RBER | PCI_EXP_DEVCAP_PAYLOAD_256B);
 }
 
 static void pci_edu_uninit(PCIDevice *pdev)
@@ -426,7 +440,9 @@ static void edu_class_init(ObjectClass *class, void *data)
 static void pci_edu_register_types(void)
 {
     static InterfaceInfo interfaces[] = {
-        { INTERFACE_CONVENTIONAL_PCI_DEVICE },
+        // { INTERFACE_CONVENTIONAL_PCI_DEVICE },
+        // 声明当前设备为 PCIe设备，不是PCI设备；在pci_qdev_realize时会判断，设置 pci_dev->cap_present |= QEMU_PCI_CAP_EXPRESS; Qemu用于判断是否是PCIe设备
+        { INTERFACE_PCIE_DEVICE },
         { },
     };
     static const TypeInfo edu_info = {
