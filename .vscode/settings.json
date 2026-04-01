@@ -1,0 +1,5 @@
+{
+    "clangd.arguments": [
+        "--compile-commands-dir=/usr/src/qemu-6.2+dfsg/b/qemu/"
+    ]
+}
